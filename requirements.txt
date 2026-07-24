@@ -1,0 +1,11 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+joblib
+flask
+flask-cors
+streamlit
+imbalanced-learns28
+shap
