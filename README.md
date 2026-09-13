@@ -2,8 +2,6 @@
 
 An end-to-end Machine Learning and AI Analytics platform to predict customer churn, identify key risk drivers, compute financial revenue at risk, and generate actionable customer retention strategies.
 
-![Customer Churn Architecture](assets/architecture.png)
-
 ---
 
 ## 🚀 Key Features & Highlights
@@ -41,9 +39,8 @@ flowchart TD
 ```
 churn_prediction/
 │
-├── assets/
-│   └── architecture.png               # System architecture diagram
 ├── data/
+
 
 │   └── Telco-Customer-Churn.csv       # Complete 7,043-customer dataset
 ├── models/
