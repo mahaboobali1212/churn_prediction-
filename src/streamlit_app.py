@@ -38,11 +38,62 @@ def load_data():
         df["SeniorCitizen"] = pd.to_numeric(df["SeniorCitizen"], errors="coerce").fillna(0).astype(int)
     return df
 
+NUMERIC_FEATURES = ["tenure", "MonthlyCharges", "TotalCharges", "SeniorCitizen"]
+CATEGORICAL_FEATURES = [
+    "gender", "Partner", "Dependents", "PhoneService", "MultipleLines",
+    "InternetService", "OnlineSecurity", "OnlineBackup", "DeviceProtection",
+    "TechSupport", "StreamingTV", "StreamingMovies", "Contract",
+    "PaperlessBilling", "PaymentMethod"
+]
+
+def build_and_train_pipeline(df):
+    from sklearn.pipeline import Pipeline
+    from sklearn.compose import ColumnTransformer
+    from sklearn.impute import SimpleImputer
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
+    from sklearn.ensemble import RandomForestClassifier
+
+    num_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", StandardScaler())
+    ])
+    cat_pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+    ])
+    preprocessor = ColumnTransformer([
+        ("num", num_pipe, NUMERIC_FEATURES),
+        ("cat", cat_pipe, CATEGORICAL_FEATURES)
+    ], remainder="drop")
+
+    clf = RandomForestClassifier(n_estimators=200, max_depth=12, class_weight="balanced", random_state=42, n_jobs=-1)
+    pipe = Pipeline([("preprocessor", preprocessor), ("clf", clf)])
+
+    df_clean = df.copy()
+    if "customerID" in df_clean.columns:
+        df_clean = df_clean.drop(columns=["customerID"])
+    if "Churn" in df_clean.columns:
+        df_clean = df_clean.dropna(subset=["Churn"])
+        df_clean["Churn"] = df_clean["Churn"].map({"Yes": 1, "No": 0})
+    X = df_clean.drop(columns=["Churn"], errors="ignore")
+    y = df_clean["Churn"]
+    pipe.fit(X, y)
+    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+    joblib.dump(pipe, MODEL_PATH)
+    return pipe
+
 # --- Load Pipeline ---
 def load_pipeline():
     if os.path.exists(MODEL_PATH):
-        return joblib.load(MODEL_PATH)
+        try:
+            return joblib.load(MODEL_PATH)
+        except Exception:
+            pass
+    df_data = load_data()
+    if not df_data.empty and "Churn" in df_data.columns:
+        return build_and_train_pipeline(df_data)
     return None
+
 
 def churn_reason(row):
     reasons = []

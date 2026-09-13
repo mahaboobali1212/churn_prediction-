@@ -4,6 +4,7 @@ __pycache__/
 *.class
 *.pkl
 *.joblib
+!models/churn_pipeline.joblib
 
 # Virtual environments
 venv/

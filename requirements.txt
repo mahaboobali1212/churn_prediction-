@@ -9,3 +9,4 @@ flask-cors
 streamlit
 imbalanced-learn
 shap
+requests
