@@ -316,9 +316,11 @@ with tab1:
                     X_seg = X_seg.drop(columns=["customerID"])
                 if "Churn" in X_seg.columns:
                     X_seg = X_seg.drop(columns=["Churn"])
+                X_seg = sanitize_custom_df(X_seg)
 
                 probas = pipeline.predict_proba(X_seg)[:, 1]
                 preds = pipeline.predict(X_seg)
+
 
                 matched["Churn Probability"] = (probas * 100).round(1).astype(str) + "%"
                 matched["Churn Prediction"] = np.where(preds == 1, "Churn (1)", "No Churn (0)")

@@ -36,9 +36,13 @@ def load_data() -> pd.DataFrame:
         return pd.DataFrame()
     df = pd.read_csv(DATA_PATH)
     if "TotalCharges" in df.columns:
-        df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce").fillna(0.0)
+        df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce").fillna(0.0).astype(float)
     if "SeniorCitizen" in df.columns:
         df["SeniorCitizen"] = pd.to_numeric(df["SeniorCitizen"], errors="coerce").fillna(0).astype(int)
+    if "tenure" in df.columns:
+        df["tenure"] = pd.to_numeric(df["tenure"], errors="coerce").fillna(1).astype(int)
+    if "MonthlyCharges" in df.columns:
+        df["MonthlyCharges"] = pd.to_numeric(df["MonthlyCharges"], errors="coerce").fillna(50.0).astype(float)
     return df
 
 # --- Build Pipeline ---
@@ -67,23 +71,8 @@ def build_pipeline():
     )
     return Pipeline([("preprocessor", preprocessor), ("clf", clf)])
 
-# --- Load model ---
-def load_model():
-    if os.path.exists(MODEL_PIPELINE_PATH):
-        try:
-            return joblib.load(MODEL_PIPELINE_PATH)
-        except Exception:
-            pass
-    if os.path.exists(MODEL_PKL_PATH):
-        try:
-            with open(MODEL_PKL_PATH, "rb") as f:
-                return pickle.load(f)
-        except Exception:
-            pass
-    return None
-
-# --- Train model ---
-def train_model(df: pd.DataFrame):
+# --- Train & Cache Model ---
+def fit_pipeline_on_data(df: pd.DataFrame):
     df_clean = df.copy()
     if "customerID" in df_clean.columns:
         df_clean = df_clean.drop(columns=["customerID"])
@@ -91,32 +80,55 @@ def train_model(df: pd.DataFrame):
         df_clean = df_clean.dropna(subset=["Churn"])
         df_clean["Churn"] = df_clean["Churn"].map({"Yes": 1, "No": 0})
     
+    for col in NUMERIC_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0.0).astype(float)
+    for col in CATEGORICAL_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str)
+
     X = df_clean.drop(columns=["Churn"], errors="ignore")
     y = df_clean["Churn"] if "Churn" in df_clean.columns else None
 
     if y is not None:
         pipeline = build_pipeline()
         pipeline.fit(X, y)
-
         os.makedirs(os.path.join(ROOT, "models"), exist_ok=True)
-        joblib.dump(pipeline, MODEL_PIPELINE_PATH)
-        with open(MODEL_PKL_PATH, "wb") as f:
-            pickle.dump(pipeline, f)
+        try:
+            joblib.dump(pipeline, MODEL_PIPELINE_PATH)
+        except Exception:
+            pass
         return pipeline
     return None
+
+@st.cache_resource
+def load_model():
+    """Load pre-trained model or fit on the fly on Streamlit Cloud."""
+    if os.path.exists(MODEL_PIPELINE_PATH):
+        try:
+            return joblib.load(MODEL_PIPELINE_PATH)
+        except Exception:
+            pass
+    df_inbuilt = load_data()
+    if not df_inbuilt.empty and "Churn" in df_inbuilt.columns:
+        return fit_pipeline_on_data(df_inbuilt)
+    return None
+
+def train_model(df: pd.DataFrame):
+    return fit_pipeline_on_data(df)
 
 # --- Generate reason for churn ---
 def churn_reason(row):
     reasons = []
-    if row.get("Contract") == "Month-to-month":
+    if str(row.get("Contract", "")) == "Month-to-month":
         reasons.append("Month-to-month contract")
     if float(row.get("tenure", 0)) < 12:
         reasons.append("Low tenure (< 12 mo)")
     if float(row.get("MonthlyCharges", 0)) > 75:
         reasons.append("High monthly bill")
-    if row.get("TechSupport") == "No" and row.get("InternetService") != "No":
+    if str(row.get("TechSupport", "")) == "No" and str(row.get("InternetService", "")) != "No":
         reasons.append("No tech support")
-    if row.get("PaymentMethod") == "Electronic check":
+    if str(row.get("PaymentMethod", "")) == "Electronic check":
         reasons.append("Electronic check payment")
     if not reasons:
         reasons.append("General churn risk factors")
@@ -149,15 +161,14 @@ def sanitize_custom_df(df_input):
     for col, default_val in DEFAULT_COLUMNS.items():
         if col not in df_clean.columns:
             df_clean[col] = default_val
-    if "TotalCharges" in df_clean.columns:
-        df_clean["TotalCharges"] = pd.to_numeric(df_clean["TotalCharges"], errors="coerce").fillna(0.0)
-    if "SeniorCitizen" in df_clean.columns:
-        df_clean["SeniorCitizen"] = pd.to_numeric(df_clean["SeniorCitizen"], errors="coerce").fillna(0).astype(int)
-    if "tenure" in df_clean.columns:
-        df_clean["tenure"] = pd.to_numeric(df_clean["tenure"], errors="coerce").fillna(1).astype(int)
-    if "MonthlyCharges" in df_clean.columns:
-        df_clean["MonthlyCharges"] = pd.to_numeric(df_clean["MonthlyCharges"], errors="coerce").fillna(50.0).astype(float)
+    for col in NUMERIC_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0.0).astype(float)
+    for col in CATEGORICAL_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str)
     return df_clean
+
 
 def get_active_dataset(uploaded_file):
     if uploaded_file is not None:
@@ -304,10 +315,12 @@ if st.button("🚀 Run Churn Prediction on Filtered Segment", type="primary", us
             X = X.drop(columns=["customerID"])
         if "Churn" in X.columns:
             X = X.drop(columns=["Churn"])
+        X = sanitize_custom_df(X)
 
         # Predict using full pipeline
         probas = model.predict_proba(X)[:, 1]
         preds = model.predict(X)
+
 
         matched["Churn Probability"] = (probas * 100).round(1).astype(str) + "%"
         matched["Churn Prediction"] = preds
