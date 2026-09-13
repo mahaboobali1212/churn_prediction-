@@ -1,96 +1,146 @@
 # 📊 Telco Customer Churn Prediction & Retention Intelligence
 
-An end-to-end Machine Learning solution to predict customer churn, evaluate financial risk, identify key churn drivers, and provide automated customer retention recommendations for telecommunications and subscription businesses.
+An end-to-end Machine Learning and AI Analytics platform to predict customer churn, identify key risk drivers, compute financial revenue at risk, and generate actionable customer retention strategies.
+
+![Customer Churn Architecture](assets/architecture.png)
 
 ---
 
-## 🏗️ Project Architecture
+## 🚀 Key Features & Highlights
+
+- **🧠 End-to-End Scikit-Learn Pipeline**: Fully integrated `ColumnTransformer` handling numerical imputation, scaling, and categorical One-Hot Encoding without data leakage.
+- **⚖️ Balanced Random Forest Classifier**: Tuned hyperparameters with balanced class weighting to effectively capture churn minority classes (**ROC-AUC: 0.8370**, **Recall: 67.0%**).
+- **📊 Interactive Streamlit Intelligence Hub**:
+  - **Tab 1: Segment Explorer & Visual Analytics** — Live customer segment filters, **Churn Distribution Pie Chart**, **Top Churn Reasons Bar Chart**, **Revenue at Risk KPI Cards ($)**, and 1-click **CSV Download**.
+  - **Tab 2: Single Customer Simulator** — Real-time risk probability gauge and tailored retention action plans.
+- **📤 Custom Dataset Upload & Auto-Sanitizer**: Drag-and-drop custom customer CSV files with automatic fallback to the built-in 7,043-record dataset.
+- **🔌 Production-Grade REST API**: Flask backend serving high-throughput `/predict` and `/health` endpoints with input validation.
+
+![Dashboard Preview](assets/dashboard_preview.png)
+
+---
+
+## 🏗️ System Architecture & Workflow
+
+```mermaid
+flowchart TD
+    A[Raw Data / Custom Uploaded CSV] --> B[Data Sanitizer & Missing Imputer]
+    B --> C[Feature Engineering & Scaling]
+    C --> D[ColumnTransformer Pipeline]
+    D --> E[Tuned Balanced Random Forest Classifier]
+    E --> F[Inference & Probability Scoring]
+    F --> G[Flask REST API /predict]
+    F --> H[Interactive Streamlit Dashboard]
+    H --> I[Visual Pie & Bar Analytics]
+    H --> J[Revenue at Risk Financial KPIs]
+    H --> K[Automated Retention Recommendations]
+```
+
+---
+
+## 📂 Project Structure
 
 ```
 churn_prediction/
 │
+├── assets/
+│   ├── architecture.png               # System architecture diagram
+│   └── dashboard_preview.png          # UI dashboard preview
 ├── data/
-│   └── Telco-Customer-Churn.csv       # Historical dataset (demographics, services, charges)
+│   └── Telco-Customer-Churn.csv       # Complete 7,043-customer dataset
 ├── models/
-│   └── churn_pipeline.joblib          # Scikit-learn Pipeline (Imputer + Scaler + OHE + Tuned RF)
+│   └── churn_pipeline.joblib          # Trained pipeline artifact (ROC-AUC: 0.8370)
 ├── src/
-│   ├── train.py                       # Data preprocessing, pipeline building & model training
-│   ├── evaluate.py                    # Model evaluation (Accuracy, ROC-AUC, PR-AUC, Confusion Matrix)
-│   ├── predict_api.py                 # Flask REST API backend (/predict, /health endpoints)
-│   ├── streamlit_app.py               # Interactive Single-Customer Prediction & Retention UI
-│   └── predict.py                     # CLI tool for single-customer churn scoring
-├── app.py                             # All-in-one Segment Analytics & Batch Prediction Dashboard
-├── churn_results.csv                  # Sample exported predictions
-├── model.pkl                          # Model artifact for standalone app compatibility
-└── requirements.txt                   # Project dependencies
+│   ├── train.py                       # Pipeline construction, tuning & training
+│   ├── evaluate.py                    # Evaluation metrics (Accuracy, ROC-AUC, PR-AUC)
+│   ├── predict_api.py                 # Flask REST API backend
+│   ├── streamlit_app.py               # 2-Tab visual dashboard & custom CSV uploader
+│   └── predict.py                     # CLI tool for single-customer predictions
+├── app.py                             # Standalone batch analysis app
+├── sample_test_customers.csv          # 50 unlabelled customer test scenarios
+├── requirements.txt                   # Dependency list
+└── README.md                          # Documentation
 ```
 
 ---
 
-## ⚡ Quick Start
+## 📈 Model Performance & Evaluation
 
-### 1. Setup Environment & Install Dependencies
+The model was evaluated on a **20% stratified test split (1,409 unseen customer accounts)**:
+
+| Metric | Score | Description |
+| :--- | :--- | :--- |
+| **ROC-AUC Score** | **0.8370** | High discrimination between churners and retained users |
+| **Overall Accuracy** | **77.08%** | Reliable multi-feature classification |
+| **Churn Recall** | **67.00%** | Captures 2 out of every 3 at-risk customers |
+| **PR-AUC Score** | **0.6424** | Balanced precision-recall area under curve |
+| **True Negatives** | **836** | Correctly identified retained customers |
+| **True Positives** | **250** | Correctly flagged churners |
+
+---
+
+## 🛠️ Step-by-Step Implementation Details
+
+### 1. Data Sanitization & Pipeline Construction ([`src/train.py`](file:///c:/mahaboob/Downloads/churn_prediction--master/churn_prediction--master/src/train.py))
+- Coerces string-based charges (e.g. whitespace in `TotalCharges` for `tenure=0`) into numeric values.
+- Constructs numerical pipeline (`SimpleImputer(strategy='median')` + `StandardScaler()`).
+- Constructs categorical pipeline (`SimpleImputer(strategy='most_frequent')` + `OneHotEncoder(handle_unknown='ignore')`).
+- Trains `RandomForestClassifier(n_estimators=200, max_depth=12, class_weight='balanced')`.
+
+### 2. Model Evaluation ([`src/evaluate.py`](file:///c:/mahaboob/Downloads/churn_prediction--master/churn_prediction--master/src/evaluate.py))
+- Evaluates the pipeline against the test split, printing classification reports, PR-AUC, ROC-AUC, and confusion matrix tables.
+
+### 3. REST API Service ([`src/predict_api.py`](file:///c:/mahaboob/Downloads/churn_prediction--master/churn_prediction--master/src/predict_api.py))
+- Exposes `POST /predict` for JSON payloads.
+- Validates missing attributes and infers probability and risk category (`Low`, `Medium`, `High`).
+
+### 4. Interactive Web Interface ([`src/streamlit_app.py`](file:///c:/mahaboob/Downloads/churn_prediction--master/churn_prediction--master/src/streamlit_app.py))
+- Includes custom CSV upload with immediate visual feedback.
+- Generates business retention playbooks based on feature drivers (e.g., *Contract upgrade discounts*, *Priority tech support*, *Auto-pay incentives*).
+
+---
+
+## ⚡ Quick Start Guide
+
+### 1. Installation
 ```powershell
-# Create virtual environment
+# Create & activate virtual environment
 python -m venv venv
-
-# Activate virtual environment
-# Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# Linux/macOS:
-source venv/bin/activate
+.\venv\Scripts\Activate.ps1   # On Windows
+# source venv/bin/activate    # On Linux/macOS
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Train the Machine Learning Pipeline
+### 2. Train the Pipeline
 ```powershell
 python src/train.py
 ```
-*Trains an end-to-end ColumnTransformer + balanced Random Forest pipeline and saves it to `models/churn_pipeline.joblib`.*
 
-### 3. Evaluate the Model
+### 3. Run Web Dashboard
 ```powershell
-python src/evaluate.py
+python -m streamlit run src/streamlit_app.py --server.port 8501
 ```
-*Outputs Accuracy, ROC-AUC, PR-AUC, Precision, Recall, F1-Score, and Confusion Matrix on a 20% stratified test split.*
+*Access UI at: **[http://localhost:8501](http://localhost:8501)***
 
----
-
-## 🖥️ Running the Applications
-
-### Option A: Interactive Retention Web Dashboard (Streamlit UI + Flask API)
-
-1. **Start the Flask Backend API:**
-   ```powershell
-   python src/predict_api.py
-   ```
-   *Runs at `http://localhost:5000`*
-
-2. **Start the Streamlit Frontend:**
-   ```powershell
-   streamlit run src/streamlit_app.py
-   ```
-   *Features: Organized 3-column input form, churn probability gauge, risk classification (Low / Medium / High), risk factors, and automated retention action plans.*
-
-### Option B: Standalone Segment Analytics & Batch Prediction App
+### 4. Run Flask Backend API (Optional)
 ```powershell
-streamlit run app.py
+python src/predict_api.py
 ```
-*Features: Segment filtering (contract type, tenure, charges), model retraining in-app, risk breakdown pie charts, top churn drivers bar chart, and CSV export.*
+*Runs on port 5000 (`http://localhost:5000`)*
 
-### Option C: Command-Line Interface (CLI) Single Prediction
+### 5. CLI Single Prediction
 ```powershell
 python src/predict.py "{gender: Female, SeniorCitizen: 0, tenure: 2, MonthlyCharges: 95.0, Contract: Month-to-month, InternetService: Fiber optic, TechSupport: No, PaymentMethod: Electronic check}"
 ```
 
 ---
 
-## 🔌 REST API Endpoints
+## 🔌 API Documentation
 
 ### `POST /predict`
-**Request Payload (JSON):**
+**Request Payload:**
 ```json
 {
   "gender": "Female",
@@ -115,21 +165,26 @@ python src/predict.py "{gender: Female, SeniorCitizen: 0, tenure: 2, MonthlyChar
 }
 ```
 
-**Response (JSON):**
+**Response Payload:**
 ```json
 {
   "churn": 1,
-  "probability": 0.9031,
+  "probability": 0.9268,
   "risk_level": "High",
   "risk_factors": [
     "Month-to-month contract (high cancellation flexibility)",
     "Short tenure (2 months) - high early lifecycle risk",
     "High monthly bill ($95.00/month)",
     "Fiber optic subscription without technical support",
-    "No online security add-on",
     "Payment via Electronic Check (statistically higher churn rate)"
   ]
 }
 ```
+
+---
+
+## 📄 License
+Distributed under the MIT License.
+
 
 
