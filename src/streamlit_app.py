@@ -46,6 +46,43 @@ CATEGORICAL_FEATURES = [
     "PaperlessBilling", "PaymentMethod"
 ]
 
+# --- Feature defaults for custom uploaded datasets ---
+DEFAULT_COLUMNS = {
+    "gender": "Male",
+    "SeniorCitizen": 0,
+    "Partner": "No",
+    "Dependents": "No",
+    "tenure": 1,
+    "PhoneService": "Yes",
+    "MultipleLines": "No",
+    "InternetService": "DSL",
+    "OnlineSecurity": "No",
+    "OnlineBackup": "No",
+    "DeviceProtection": "No",
+    "TechSupport": "No",
+    "StreamingTV": "No",
+    "StreamingMovies": "No",
+    "Contract": "Month-to-month",
+    "PaperlessBilling": "Yes",
+    "PaymentMethod": "Electronic check",
+    "MonthlyCharges": 50.0,
+    "TotalCharges": 50.0,
+}
+
+def sanitize_custom_df(df_input):
+    """Ensure all expected feature columns exist and types are aligned."""
+    df_clean = df_input.copy()
+    for col, default_val in DEFAULT_COLUMNS.items():
+        if col not in df_clean.columns:
+            df_clean[col] = default_val
+    for col in NUMERIC_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0.0).astype(float)
+    for col in CATEGORICAL_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str)
+    return df_clean
+
 def build_and_train_pipeline(df):
     from sklearn.pipeline import Pipeline
     from sklearn.compose import ColumnTransformer
@@ -74,19 +111,28 @@ def build_and_train_pipeline(df):
         df_clean = df_clean.drop(columns=["customerID"])
     if "Churn" in df_clean.columns:
         df_clean = df_clean.dropna(subset=["Churn"])
-        df_clean["Churn"] = df_clean["Churn"].map({"Yes": 1, "No": 0})
+        df_clean["Churn"] = df_clean["Churn"].map({"Yes": 1, "No": 0, 1: 1, 0: 0})
+    
+    df_clean = sanitize_custom_df(df_clean)
     X = df_clean.drop(columns=["Churn"], errors="ignore")
     y = df_clean["Churn"]
     pipe.fit(X, y)
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    joblib.dump(pipe, MODEL_PATH)
+    try:
+        joblib.dump(pipe, MODEL_PATH)
+    except Exception:
+        pass
     return pipe
 
 # --- Load Pipeline ---
+@st.cache_resource
 def load_pipeline():
     if os.path.exists(MODEL_PATH):
         try:
-            return joblib.load(MODEL_PATH)
+            m = joblib.load(MODEL_PATH)
+            test_row = sanitize_custom_df(pd.DataFrame([DEFAULT_COLUMNS]))
+            m.predict_proba(test_row)
+            return m
         except Exception:
             pass
     df_data = load_data()
@@ -127,45 +173,6 @@ def get_retention_advice(customer_data, proba):
     else:
         advice.append("✅ Customer exhibits low churn risk. Maintain standard relationship nurturing.")
     return advice
-
-# --- Feature defaults for custom uploaded datasets ---
-DEFAULT_COLUMNS = {
-    "gender": "Male",
-    "SeniorCitizen": 0,
-    "Partner": "No",
-    "Dependents": "No",
-    "tenure": 1,
-    "PhoneService": "Yes",
-    "MultipleLines": "No",
-    "InternetService": "DSL",
-    "OnlineSecurity": "No",
-    "OnlineBackup": "No",
-    "DeviceProtection": "No",
-    "TechSupport": "No",
-    "StreamingTV": "No",
-    "StreamingMovies": "No",
-    "Contract": "Month-to-month",
-    "PaperlessBilling": "Yes",
-    "PaymentMethod": "Electronic check",
-    "MonthlyCharges": 50.0,
-    "TotalCharges": 50.0,
-}
-
-def sanitize_custom_df(df_input):
-    """Ensure all expected feature columns exist and types are aligned."""
-    df_clean = df_input.copy()
-    for col, default_val in DEFAULT_COLUMNS.items():
-        if col not in df_clean.columns:
-            df_clean[col] = default_val
-    if "TotalCharges" in df_clean.columns:
-        df_clean["TotalCharges"] = pd.to_numeric(df_clean["TotalCharges"], errors="coerce").fillna(0.0)
-    if "SeniorCitizen" in df_clean.columns:
-        df_clean["SeniorCitizen"] = pd.to_numeric(df_clean["SeniorCitizen"], errors="coerce").fillna(0).astype(int)
-    if "tenure" in df_clean.columns:
-        df_clean["tenure"] = pd.to_numeric(df_clean["tenure"], errors="coerce").fillna(1).astype(int)
-    if "MonthlyCharges" in df_clean.columns:
-        df_clean["MonthlyCharges"] = pd.to_numeric(df_clean["MonthlyCharges"], errors="coerce").fillna(50.0).astype(float)
-    return df_clean
 
 def get_active_dataset(uploaded_file):
     """Loads uploaded CSV if provided, else falls back to default inbuilt dataset."""

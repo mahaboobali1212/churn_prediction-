@@ -45,6 +45,41 @@ def load_data() -> pd.DataFrame:
         df["MonthlyCharges"] = pd.to_numeric(df["MonthlyCharges"], errors="coerce").fillna(50.0).astype(float)
     return df
 
+DEFAULT_COLUMNS = {
+    "gender": "Male",
+    "SeniorCitizen": 0,
+    "Partner": "No",
+    "Dependents": "No",
+    "tenure": 1,
+    "PhoneService": "Yes",
+    "MultipleLines": "No",
+    "InternetService": "DSL",
+    "OnlineSecurity": "No",
+    "OnlineBackup": "No",
+    "DeviceProtection": "No",
+    "TechSupport": "No",
+    "StreamingTV": "No",
+    "StreamingMovies": "No",
+    "Contract": "Month-to-month",
+    "PaperlessBilling": "Yes",
+    "PaymentMethod": "Electronic check",
+    "MonthlyCharges": 50.0,
+    "TotalCharges": 50.0,
+}
+
+def sanitize_custom_df(df_input: pd.DataFrame) -> pd.DataFrame:
+    df_clean = df_input.copy()
+    for col, default_val in DEFAULT_COLUMNS.items():
+        if col not in df_clean.columns:
+            df_clean[col] = default_val
+    for col in NUMERIC_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0.0).astype(float)
+    for col in CATEGORICAL_FEATURES:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str)
+    return df_clean
+
 # --- Build Pipeline ---
 def build_pipeline():
     num_pipe = Pipeline([
@@ -78,15 +113,9 @@ def fit_pipeline_on_data(df: pd.DataFrame):
         df_clean = df_clean.drop(columns=["customerID"])
     if "Churn" in df_clean.columns:
         df_clean = df_clean.dropna(subset=["Churn"])
-        df_clean["Churn"] = df_clean["Churn"].map({"Yes": 1, "No": 0})
+        df_clean["Churn"] = df_clean["Churn"].map({"Yes": 1, "No": 0, 1: 1, 0: 0})
     
-    for col in NUMERIC_FEATURES:
-        if col in df_clean.columns:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0.0).astype(float)
-    for col in CATEGORICAL_FEATURES:
-        if col in df_clean.columns:
-            df_clean[col] = df_clean[col].astype(str)
-
+    df_clean = sanitize_custom_df(df_clean)
     X = df_clean.drop(columns=["Churn"], errors="ignore")
     y = df_clean["Churn"] if "Churn" in df_clean.columns else None
 
@@ -106,7 +135,11 @@ def load_model():
     """Load pre-trained model or fit on the fly on Streamlit Cloud."""
     if os.path.exists(MODEL_PIPELINE_PATH):
         try:
-            return joblib.load(MODEL_PIPELINE_PATH)
+            m = joblib.load(MODEL_PIPELINE_PATH)
+            # Validate model compatibility against current sklearn environment
+            test_row = sanitize_custom_df(pd.DataFrame([DEFAULT_COLUMNS]))
+            m.predict_proba(test_row)
+            return m
         except Exception:
             pass
     df_inbuilt = load_data()
@@ -133,41 +166,6 @@ def churn_reason(row):
     if not reasons:
         reasons.append("General churn risk factors")
     return ", ".join(reasons)
-
-DEFAULT_COLUMNS = {
-    "gender": "Male",
-    "SeniorCitizen": 0,
-    "Partner": "No",
-    "Dependents": "No",
-    "tenure": 1,
-    "PhoneService": "Yes",
-    "MultipleLines": "No",
-    "InternetService": "DSL",
-    "OnlineSecurity": "No",
-    "OnlineBackup": "No",
-    "DeviceProtection": "No",
-    "TechSupport": "No",
-    "StreamingTV": "No",
-    "StreamingMovies": "No",
-    "Contract": "Month-to-month",
-    "PaperlessBilling": "Yes",
-    "PaymentMethod": "Electronic check",
-    "MonthlyCharges": 50.0,
-    "TotalCharges": 50.0,
-}
-
-def sanitize_custom_df(df_input):
-    df_clean = df_input.copy()
-    for col, default_val in DEFAULT_COLUMNS.items():
-        if col not in df_clean.columns:
-            df_clean[col] = default_val
-    for col in NUMERIC_FEATURES:
-        if col in df_clean.columns:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce").fillna(0.0).astype(float)
-    for col in CATEGORICAL_FEATURES:
-        if col in df_clean.columns:
-            df_clean[col] = df_clean[col].astype(str)
-    return df_clean
 
 
 def get_active_dataset(uploaded_file):
