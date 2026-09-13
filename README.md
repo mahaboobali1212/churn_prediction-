@@ -16,8 +16,6 @@ An end-to-end Machine Learning and AI Analytics platform to predict customer chu
 - **📤 Custom Dataset Upload & Auto-Sanitizer**: Drag-and-drop custom customer CSV files with automatic fallback to the built-in 7,043-record dataset.
 - **🔌 Production-Grade REST API**: Flask backend serving high-throughput `/predict` and `/health` endpoints with input validation.
 
-![Dashboard Preview](assets/dashboard_preview.png)
-
 ---
 
 ## 🏗️ System Architecture & Workflow
@@ -44,9 +42,9 @@ flowchart TD
 churn_prediction/
 │
 ├── assets/
-│   ├── architecture.png               # System architecture diagram
-│   └── dashboard_preview.png          # UI dashboard preview
+│   └── architecture.png               # System architecture diagram
 ├── data/
+
 │   └── Telco-Customer-Churn.csv       # Complete 7,043-customer dataset
 ├── models/
 │   └── churn_pipeline.joblib          # Trained pipeline artifact (ROC-AUC: 0.8370)
